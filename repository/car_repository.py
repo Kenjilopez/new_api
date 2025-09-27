@@ -1,4 +1,3 @@
-
 # Importaciones de librerías:
 # - sqlalchemy: Proporciona herramientas para trabajar con bases de datos relacionales en Python mediante ORM (Object Relational Mapping).
 #   - Column, Integer, String, ForeignKey: Permiten definir los tipos de columnas y relaciones entre tablas en los modelos de base de datos.
@@ -7,8 +6,7 @@
 #   - declarative_base: Se utiliza para crear una clase base a partir de la cual se definen los modelos ORM.
 
 from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship, declarative_base
-
+from sqlalchemy.orm import relationship, declarative_base, Session
 
 Base = declarative_base()
 
@@ -37,3 +35,43 @@ class Car(Base):
     model = Column(String(255), nullable=False)
     store_id = Column(Integer, ForeignKey('car_stores.id'))
     store = relationship('CarStore', back_populates='cars')
+
+
+# Funciones CRUD para el repositorio de carros
+
+def get_all_cars(session: Session):
+    return session.query(Car).all()
+
+
+def get_car_by_id(session: Session, car_id: int):
+    return session.query(Car).get(car_id)
+
+
+def create_car(session: Session, model: str, store_id: int):
+    car = Car(model=model, store_id=store_id)
+    session.add(car)
+    session.commit()
+    return car
+
+
+def update_car(session: Session, car_id: int, model: str = None, store_id: int = None):
+    car = session.query(Car).get(car_id)
+    if not car:
+        return None
+    if model:
+        car.model = model
+    if store_id:
+        car.store_id = store_id
+    session.commit()
+    return car
+
+
+def delete_car(session: Session, car_id: int):
+    car = session.query(Car).get(car_id)
+    if not car:
+        return False
+    session.delete(car)
+    session.commit()
+    return True
+
+# Dentro de tus rutas Flask, crea una sesión y llama a estas funciones.
