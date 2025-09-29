@@ -3,7 +3,8 @@ import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
-from models.band_model import Base
+from models.car_model import Base
+from models.users_model import Base
 from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO)
 
@@ -11,7 +12,8 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 MYSQL_URI = os.getenv('MYSQL_URI')
-SQLITE_URI = 'sqlite:///bands_local.db'
+SQLITE_URI = 'sqlite:///cars.db'
+SQLITE_URI = 'sqlite:///users.db'
 
 def get_engine():
     """
