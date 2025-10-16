@@ -36,24 +36,21 @@ class UserRepository:
         #SELECT * FROM users WHERE id = user_id;
         logger.info(f"Buscando usuario por ID: {user_id}")
         return self.db.query(User).filter(User.id == user_id).first()
+    
+    def get_user_by_email(self, email: str):
+        logger.info(f"Buscando usuario por email: {email}")
+        return self.db.query(User).filter(User.email == email).first()
 
-    def create_user(self, username: str, password: str):
-        """
-        Crea y almacena un nuevo usuario en la base de datos.
-        Recibe el nombre de usuario y la contraseña como parámetros, instancia un nuevo objeto User
-        y lo agrega a la sesión de la base de datos. Tras confirmar la transacción,
-        retorna el nuevo usuario creado, incluyendo su ID asignado automáticamente.
-        Es útil para registrar nuevos usuarios en el sistema.
-        """
-        #INSERT INTO users (username, password) VALUES (username, password);
-        logger.info(f"Creando usuario: {username}")
-        new_user = User(username=username, password=password)
+    def create_user(self, email: str, password: str, role:str="user"):
+        
+        logger.info(f"Creando usuario: {email}")
+        new_user = User(email=email, password=password, role=role)
         self.db.add(new_user)
         self.db.commit()
         self.db.refresh(new_user)
         return new_user
-    
-    def update_user(self, user_id: int, username: str = None, password: str = None):
+
+    def update_user(self, user_id: int, email: str = None, password: str = None, role: str = None):
         """
         Actualiza la información de un usuario existente en la base de datos.
         Permite modificar el nombre de usuario y/o la contraseña del usuario identificado por su ID.
@@ -65,10 +62,12 @@ class UserRepository:
         user = self.get_user_by_id(user_id)
         if user:
             logger.info(f"Actualizando usuario: {user_id}")
-            if username:
-                user.username = username
+            if email:
+                user.email = email
             if password:
                 user.password = password
+            if role:
+                user.role = role
             self.db.commit()
             self.db.refresh(user)
             return user
