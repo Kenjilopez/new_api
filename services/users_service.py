@@ -10,13 +10,13 @@ class UsersService:
     def __init__(self, db_session):
         self.users_repository = UserRepository(db_session)
 
-    def authenticate_user(self, username: str, password: str):
-        user = self.users_repository.db.query(User).filter(User.username == username).first()
-        logger.info(f"Authenticating user: {username}")
+    def authenticate_user(self, email: str, password: str):
+        user = self.users_repository.db.query(User).filter(User.email == email).first()
+        logger.info(f"Authenticating user: {email}")
         if user and check_password_hash(user.password, password):
-            logger.info(f"User authenticated successfully: {username}")
+            logger.info(f"User authenticated successfully: {email}")
             return user
-        logger.warning(f"Failed authentication attempt: {username}")
+        logger.warning(f"Failed authentication attempt: {email}")
         return None
 
     def get_all_users(self):
@@ -27,15 +27,15 @@ class UsersService:
         logger.info(f"Fetching user by ID: {user_id}")
         return self.users_repository.get_user_by_id(user_id)
 
-    def create_user(self, username: str, password: str):
+    def create_user(self, email: str, password: str,role:str="admin"):
         password_hashed = generate_password_hash(password)
-        logger.info(f"Creating user: {username}")
-        return self.users_repository.create_user(username, password_hashed)
+        logger.info(f"Creating user: {email}")
+        return self.users_repository.create_user(email, password_hashed,role)
     
 
-    def update_user(self, user_id: int, username: str = None, password: str = None):
+    def update_user(self, user_id: int, email: str = None, password: str = None, role: str = None):
         logger.info(f"Updating user: {user_id}")
-        return self.users_repository.update_user(user_id, username, password)
+        return self.users_repository.update_user(user_id, email, password, role)
 
     def delete_user(self, user_id: int):
         logger.info(f"Deleting user: {user_id}")
