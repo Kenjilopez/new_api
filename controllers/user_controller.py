@@ -3,7 +3,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from services.users_service import UsersService
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, jwt_required, JWTManager
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
 # Handler personalizado para errores de autenticación JWT
 from flask_jwt_extended.exceptions import NoAuthorizationError
 from flask import current_app
@@ -30,22 +30,22 @@ def login():
     POST /login
     Autentica a un usuario y retorna un token JWT si las credenciales son correctas.
     Parámetros esperados (JSON):
-        username (str): Nombre de usuario.
+        email (str): correo.
         password (str): Contraseña del usuario.
     Respuesta: JSON con el token JWT o mensaje de error si las credenciales son inválidas.
     """
     data = request.get_json()
-    username = data.get('username')
+    email = data.get('email')
     password = data.get('password')
-    if not username or not password:
-        logger.warning("Login fallido: usuario o contrasena no proporcionados")
-        return jsonify({'error': 'El nombre de usuario y la contrasena son obligatorios'}), 400, {'Content-Type': 'application/json; charset=utf-8'}
-    user = service.authenticate_user(username, password)
+    if not email or not password:
+        logger.warning("Login fallido: email o contrasena no proporcionados")
+        return jsonify({'error': 'El email y la contrasena son obligatorios'}), 400, {'Content-Type': 'application/json; charset=utf-8'}
+    user = service.authenticate_user(email, password)
     if user:
-        access_token = create_access_token(identity={'id': user.id, 'username': user.username})
-        logger.info(f"Usuario autenticado: {username}")
+        access_token = create_access_token(identity={'id': user.id, 'email': user.email})
+        logger.info(f"Usuario autenticado: {email}")
         return jsonify({'access_token': access_token}), 200, {'Content-Type': 'application/json; charset=utf-8'}
-    logger.warning(f"Login fallido para usuario: {username}")
+    logger.warning(f"Login fallido para usuario: {email}")
     return jsonify({'error': 'Credenciales invalidas'}), 401, {'Content-Type': 'application/json; charset=utf-8'}
 
 @user_bp.route('/users', methods=['GET'])
@@ -60,7 +60,7 @@ def get_users():
     """
     users = service.get_all_users()
     logger.info("Consulta de todos los usuarios")
-    return jsonify([{'id': u.id, 'username': u.username} for u in users]), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    return jsonify([{'id': u.id, 'email': u.email, 'role': u.role} for u in users]), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 @user_bp.route('/users/<int:user_id>', methods=['GET'])
 @jwt_required()
@@ -75,9 +75,9 @@ def get_user(user_id):
     user = service.get_user_by_id(user_id)
     if user:
         logger.info(f"Consulta de usuario por ID: {user_id}")
-        return jsonify({'id': user.id, 'username': user.username}), 200, {'Content-Type': 'application/json; charset=utf-8'}
-    logger.warning(f"Usuario no encontrado: {user_id}")
-    return jsonify({'error': 'Usuario no encontrado'}), 404, {'Content-Type': 'application/json; charset=utf-8'}
+        return jsonify({'id': user.id, 'email': user.email, 'role': user.role }), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    logger.warning(f"email no encontrado: {user_id}")
+    return jsonify({'error': 'Email no encontrado'}), 404, {'Content-Type': 'application/json; charset=utf-8'}
 
 @user_bp.route('/registry', methods=['POST'])
 def create_user():
@@ -90,14 +90,15 @@ def create_user():
     Respuesta: JSON con los datos del usuario creado.
     """
     data = request.get_json()
-    username = data.get('username')
+    email = data.get('email')
     password = data.get('password')
-    if not username or not password:
-        logger.warning("Registro fallido: usuario o contraseña no proporcionados")
-        return jsonify({'error': 'El nombre de usuario y la contraseña son obligatorios'}), 400, {'Content-Type': 'application/json; charset=utf-8'}
-    user = service.create_user(username, password)
-    logger.info(f"Usuario creado: {username}")
-    return jsonify({'id': user.id, 'username': user.username}), 201, {'Content-Type': 'application/json; charset=utf-8'}
+    role = data.get('role', 'user')
+    if not email or not password:
+        logger.warning("Registro fallido: email o contraseña no proporcionados")
+        return jsonify({'error': 'El email y la contraseña son obligatorios'}), 400, {'Content-Type': 'application/json; charset=utf-8'}
+    user = service.create_user(email, password,role)
+    logger.info(f"Usuario creado: {email}")
+    return jsonify({'id': user.id, 'email': user.email, 'role': user.role}), 201, {'Content-Type': 'application/json; charset=utf-8'}
 
 @user_bp.route('/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
@@ -108,17 +109,18 @@ def update_user(user_id):
     Parámetros:
         user_id (int): ID del usuario a actualizar (en la URL).
     Parámetros esperados (JSON):
-        username (str, opcional): Nuevo nombre de usuario.
+        email (str, opcional): Nuevo email.
         password (str, opcional): Nueva contraseña del usuario.
     Respuesta: JSON con los datos del usuario actualizado o 404 si no existe.
     """
     data = request.get_json()
-    username = data.get('username')
+    email = data.get('email')
     password = data.get('password')
-    user = service.update_user(user_id, username, password)
+    user = service.update_user(user_id, email, password)
+    
     if user:
         logger.info(f"Usuario actualizado: {user_id}")
-        return jsonify({'id': user.id, 'username': user.username}), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        return jsonify({'id': user.id, 'username': user.username, 'role': user.role}), 200, {'Content-Type': 'application/json; charset=utf-8'}
     logger.warning(f"Usuario no encontrado para actualizar: {user_id}")
     return jsonify({'error': 'Usuario no encontrado'}), 404, {'Content-Type': 'application/json; charset=utf-8'}
 
@@ -132,6 +134,11 @@ def delete_user(user_id):
         user_id (int): ID del usuario a eliminar (en la URL).
     Respuesta: JSON confirmando la eliminación o 404 si no existe.
     """
+    identity = get_jwt_identity()
+    if identity['role'] != 'admin':
+        logger.warning(f"Acceso denegado para eliminar usuario: {identity['email']}")
+        return jsonify({'error': 'Acceso denegado'}), 403
+    
     user = service.delete_user(user_id)
     if user:
         logger.info(f"Usuario eliminado: {user_id}")
