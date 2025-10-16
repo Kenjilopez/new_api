@@ -13,7 +13,7 @@ from config.database import get_db_session
 service = UsersService(get_db_session())
 
 
-user_bp = Blueprint('users', __name__)
+user_bp = Blueprint('email', __name__)
 
 
 def register_jwt_error_handlers(app):

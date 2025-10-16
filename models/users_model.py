@@ -18,4 +18,4 @@ class User(Base):
     # No permite valores nulos. La longitud sugiere que se almacenará un hash de la contraseña, no la contraseña en texto plano
     password = Column(String(255), nullable=False)
     
-    role = Column(String(50, nullable=False),default='user')
+    role = Column(String(50),default='user')
