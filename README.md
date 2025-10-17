@@ -54,16 +54,16 @@ http://127.0.0.1:5000/refresh [POST]
 Autorization 
 Auth type:  Bearer Token 
 
-Token: "your refresh token given u when u making login" 
+Token: "your refresh token given u when u making login" ❗
 
-Warming: you have only 1 minute for use this token 
+Warming: you have only 1 minute for use this token ⚠
 
 http://127.0.0.1:5000/users  [GET]
 
 Autorization 
 Auth type:  Bearer Token 
 
-Token: "your refresh token given u when u making login" 
+Token: "your refresh token given u when u making login" ❗
 
 http://127.0.0.1:5000/users/id [PUT]
 To modify
@@ -77,7 +77,7 @@ http://127.0.0.1:5000/users/id [DELETE]
 Autorization 
 Auth type:  Bearer Token 
 
-Token: "your refresh token given u when u making login" 
+Token: "your refresh token given u when u making login" ❗
 
-Warming: You can delete an user if you user had as Role "admin"
+Warming: You can delete an user if you user had as Role "admin"  ⚠
 
