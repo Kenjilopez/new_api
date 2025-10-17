@@ -3,7 +3,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from services.users_service import UsersService
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager, get_jwt,create_refresh_token
 # Handler personalizado para errores de autenticación JWT
 from flask_jwt_extended.exceptions import NoAuthorizationError
 from flask import current_app
@@ -42,11 +42,27 @@ def login():
         return jsonify({'error': 'El email y la contrasena son obligatorios'}), 400, {'Content-Type': 'application/json; charset=utf-8'}
     user = service.authenticate_user(email, password)
     if user:
-        access_token = create_access_token(identity={'id': user.id, 'email': user.email})
+        # identity must be a string (subject). Put id as subject and add email/role in claims
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims={'email': user.email, 'role': user.role}
+        )
+        refresh_token = create_refresh_token(
+            identity=str(user.id),
+            additional_claims={'email': user.email, 'role': user.role}
+        )
         logger.info(f"Usuario autenticado: {email}")
-        return jsonify({'access_token': access_token}), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        return jsonify({'access_token': access_token, 'refresh_token': refresh_token}), 200, {'Content-Type': 'application/json; charset=utf-8'}
     logger.warning(f"Login fallido para usuario: {email}")
     return jsonify({'error': 'Credenciales invalidas'}), 401, {'Content-Type': 'application/json; charset=utf-8'}
+
+@user_bp.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    identity = get_jwt_identity()
+    new_access_token = create_access_token(identity=identity)
+    logger.info(f"Access token renovado para usuario: {identity['email']}")
+    return jsonify({'access_token': new_access_token}), 200
 
 @user_bp.route('/users', methods=['GET'])
 @jwt_required()
@@ -120,7 +136,7 @@ def update_user(user_id):
     
     if user:
         logger.info(f"Usuario actualizado: {user_id}")
-        return jsonify({'id': user.id, 'username': user.username, 'role': user.role}), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        return jsonify({'id': user.id, 'email': user.email, 'role': user.role}), 200, {'Content-Type': 'application/json; charset=utf-8'}
     logger.warning(f"Usuario no encontrado para actualizar: {user_id}")
     return jsonify({'error': 'Usuario no encontrado'}), 404, {'Content-Type': 'application/json; charset=utf-8'}
 
@@ -134,9 +150,10 @@ def delete_user(user_id):
         user_id (int): ID del usuario a eliminar (en la URL).
     Respuesta: JSON confirmando la eliminación o 404 si no existe.
     """
-    identity = get_jwt_identity()
-    if identity['role'] != 'admin':
-        logger.warning(f"Acceso denegado para eliminar usuario: {identity['email']}")
+    # identity now returns the subject (string id). Read claims with get_jwt()
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        logger.warning(f"Acceso denegado para eliminar usuario: {claims.get('email')}")
         return jsonify({'error': 'Acceso denegado'}), 403
     
     user = service.delete_user(user_id)
