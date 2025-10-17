@@ -59,9 +59,15 @@ def login():
 @user_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)
 def refresh():
+    # identity is the subject (string id). Read claims with get_jwt() to access email/role
     identity = get_jwt_identity()
-    new_access_token = create_access_token(identity=identity)
-    logger.info(f"Access token renovado para usuario: {identity['email']}")
+    claims = get_jwt()
+    # Recreate access token keeping email and role in additional claims
+    new_access_token = create_access_token(
+        identity=identity,
+        additional_claims={'email': claims.get('email'), 'role': claims.get('role')}
+    )
+    logger.info(f"Access token renovado para usuario: {claims.get('email')}")
     return jsonify({'access_token': new_access_token}), 200
 
 @user_bp.route('/users', methods=['GET'])
