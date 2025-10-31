@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Car Store Frontend</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+      form { margin-bottom: 1rem; }
+      label { display:block; margin-top: .5rem; }
+      input[type="text"], input[type="number"] { padding: .4rem; width: 100%; max-width: 320px; }
+      button { margin-top: .6rem; padding: .5rem 1rem; }
+      .car { border: 1px solid #ddd; padding: .6rem; margin: .4rem 0; display:flex; justify-content:space-between; align-items:center }
+      .car > .info { flex:1 }
+      .small { font-size: .9rem; color:#555 }
+    </style>
+  </head>
+  <body>
+    <h1>Car Store</h1>
+    <p class="small">This is a simple static frontend that calls the Flask API endpoints at <code>http://127.0.0.1:5000</code>. Make sure your API is running.</p>
+
+    <section>
+      <h2>Add a car</h2>
+      <form id="addCarForm">
+        <label>Model
+          <input id="model" name="model" type="text" required />
+        </label>
+        <label>Store ID
+          <input id="storeId" name="store_id" type="number" required />
+        </label>
+        <button type="submit">Add Car</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Cars</h2>
+      <div id="carsList">Loading...</div>
+    </section>
+
+    <script>
+      // Change BASE_URL if your Flask server is running elsewhere
+      const BASE_URL = 'http://127.0.0.1:5000';
+
+      async function fetchCars() {
+        const list = document.getElementById('carsList');
+        list.innerHTML = 'Loading...';
+        try {
+          const res = await fetch(`${BASE_URL}/cars`);
+          if (!res.ok) throw new Error('Failed to load');
+          const cars = await res.json();
+          if (!Array.isArray(cars) || cars.length === 0) {
+            list.innerHTML = '<em>No cars yet</em>';
+            return;
+          }
+          list.innerHTML = '';
+          cars.forEach(car => {
+            const div = document.createElement('div');
+            div.className = 'car';
+            const info = document.createElement('div');
+            info.className = 'info';
+            info.innerHTML = `<strong>${escapeHtml(car.model)}</strong> <div class="small">id: ${car.id} — store: ${car.store_id}</div>`;
+            const actions = document.createElement('div');
+
+            // Delete button
+            const del = document.createElement('button');
+            del.textContent = 'Delete';
+            del.onclick = async () => {
+              if (!confirm('Delete this car?')) return;
+              await callApi('DELETE', `/cars/${car.id}`);
+              fetchCars();
+            };
+
+            // Update button (simple prompt-based edit)
+            const upd = document.createElement('button');
+            upd.textContent = 'Edit';
+            upd.style.marginRight = '0.4rem';
+            upd.onclick = async () => {
+              const newModel = prompt('New model', car.model);
+              if (newModel === null) return;
+              const newStore = prompt('New store id', car.store_id);
+              if (newStore === null) return;
+              await callApi('PUT', `/cars/${car.id}`, { model: newModel, store_id: Number(newStore) });
+              fetchCars();
+            };
+
+            actions.appendChild(upd);
+            actions.appendChild(del);
+
+            div.appendChild(info);
+            div.appendChild(actions);
+            list.appendChild(div);
+          });
+        } catch (err) {
+          list.innerHTML = `<span style="color:crimson">Error loading cars: ${escapeHtml(err.message)}</span>`;
+        }
+      }
+
+      async function callApi(method, path, body) {
+        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(BASE_URL + path, opts);
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>null);
+          throw new Error(`API ${method} ${path} failed: ${res.status} ${txt || ''}`);
+        }
+        return res.json().catch(()=>null);
+      }
+
+      document.getElementById('addCarForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const model = document.getElementById('model').value.trim();
+        const storeId = Number(document.getElementById('storeId').value);
+        try {
+          await callApi('POST', '/cars', { model, store_id: storeId });
+          e.target.reset();
+          fetchCars();
+        } catch (err) {
+          alert('Error: ' + err.message);
+        }
+      });
+
+      // Basic HTML escaper to avoid accidental injection in this demo
+      function escapeHtml(str) {
+        if (str === undefined || str === null) return '';
+        return String(str).replace(/[&<>\"']/g, function (s) {
+          return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s];
+        });
+      }
+
+      // Load initial data
+      fetchCars();
+    </script>
+  </body>
+</html>
