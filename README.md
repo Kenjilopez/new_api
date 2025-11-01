@@ -3,6 +3,7 @@ Install these packages:(👇)
 pip install virtualenv
 Crea el entorno virtual:
 
+
 python -m venv venv
 Esto creará una carpeta llamada venv en el directorio del proyecto.
 
