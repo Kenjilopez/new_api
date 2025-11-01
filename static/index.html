@@ -236,6 +236,19 @@
         let token = localStorage.getItem('token');
         const API_URL = window.location.origin;
 
+        // Add axios interceptor for handling token expiration
+        axios.interceptors.response.use(
+            response => response,
+            error => {
+                if (error.response?.status === 401) {
+                    // Token might be expired
+                    showToast('Session expired. Please login again', 'error');
+                    logout();
+                }
+                return Promise.reject(error);
+            }
+        );
+
         // Utility functions
         function showLoading() {
             document.getElementById('loadingOverlay').classList.remove('hidden');
@@ -272,18 +285,29 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
+            if (!email || !password) {
+                showToast('Please enter both email and password', 'error');
+                return;
+            }
+
             try {
                 showLoading();
                 const response = await axios.post(`${API_URL}/login`, {
                     email: email,
                     password: password
                 });
-                token = response.data.access_token;
-                localStorage.setItem('token', token);
-                checkAuth();
-                showToast('Login successful!');
+                
+                if (response.data.access_token) {
+                    token = response.data.access_token;
+                    localStorage.setItem('token', token);
+                    checkAuth();
+                    showToast('Login successful!');
+                } else {
+                    throw new Error('No access token received');
+                }
             } catch (error) {
-                showToast(error.response?.data?.error || 'Login failed', 'error');
+                console.error('Login error:', error);
+                showToast(error.response?.data?.error || 'Login failed. Please check your credentials.', 'error');
             } finally {
                 hideLoading();
             }
@@ -316,17 +340,32 @@
 
         // Cars management functions
         async function loadCars() {
+            if (!token) {
+                showToast('Please login first', 'error');
+                return;
+            }
+
             try {
                 showLoading();
-                const response = await axios.get(`${API_URL}/cars`, {
+                const config = {
                     headers: { 'Authorization': `Bearer ${token}` }
-                });
-                displayCars(response.data);
-            } catch (error) {
-                if (error.response?.status === 401) {
-                    logout();
+                };
+                
+                const response = await axios.get(`${API_URL}/cars`, config);
+                
+                if (response.status === 200 && Array.isArray(response.data)) {
+                    displayCars(response.data);
+                } else {
+                    throw new Error('Invalid response format');
                 }
-                showToast('Error loading cars', 'error');
+            } catch (error) {
+                console.error('Load cars error:', error);
+                if (error.response?.status === 401) {
+                    showToast('Session expired. Please login again', 'error');
+                    logout();
+                } else {
+                    showToast(error.response?.data?.error || 'Error loading cars', 'error');
+                }
             } finally {
                 hideLoading();
             }
@@ -411,7 +450,7 @@
 
         // Modal management
         function showAddCarModal() {
-            document.getElementById('modalTitleText').textContent = 'Add New Car';
+            document.getElementById('modalTitle').textContent = 'Add New Car';
             document.getElementById('carId').value = '';
             document.getElementById('carModel').value = '';
             document.getElementById('storeId').value = '';
@@ -419,7 +458,7 @@
         }
 
         function showEditCarModal(id, model, storeId) {
-            document.getElementById('modalTitleText').textContent = 'Edit Car';
+            document.getElementById('modalTitle').textContent = 'Edit Car';
             document.getElementById('carId').value = id;
             document.getElementById('carModel').value = model;
             document.getElementById('storeId').value = storeId;
@@ -444,31 +483,54 @@
                 return;
             }
 
+            if (!token) {
+                showToast('Please login first', 'error');
+                return;
+            }
+
             try {
                 showLoading();
+                const config = {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                };
+                
                 if (id) {
                     // Update existing car
-                    await axios.put(`${API_URL}/cars/${id}`, {
-                        model: model,
-                        store_id: storeId
-                    }, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    showToast('Car updated successfully');
+                    const response = await axios.put(
+                        `${API_URL}/cars/${id}`,
+                        { model: model, store_id: storeId },
+                        config
+                    );
+                    
+                    if (response.status === 200) {
+                        showToast('Car updated successfully');
+                    } else {
+                        throw new Error('Failed to update car');
+                    }
                 } else {
                     // Add new car
-                    await axios.post(`${API_URL}/cars`, {
-                        model: model,
-                        store_id: storeId
-                    }, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    showToast('Car added successfully');
+                    const response = await axios.post(
+                        `${API_URL}/cars`,
+                        { model: model, store_id: storeId },
+                        config
+                    );
+                    
+                    if (response.status === 201) {
+                        showToast('Car added successfully');
+                    } else {
+                        throw new Error('Failed to add car');
+                    }
                 }
                 hideCarModal();
-                loadCars();
+                await loadCars();
             } catch (error) {
-                showToast(error.response?.data?.error || 'Operation failed', 'error');
+                console.error('Save car error:', error);
+                if (error.response?.status === 401) {
+                    showToast('Session expired. Please login again', 'error');
+                    logout();
+                } else {
+                    showToast(error.response?.data?.error || 'Operation failed', 'error');
+                }
             } finally {
                 hideLoading();
             }
@@ -481,15 +543,33 @@
         }
 
         async function deleteCar(id) {
+            if (!token) {
+                showToast('Please login first', 'error');
+                return;
+            }
+
             try {
                 showLoading();
-                await axios.delete(`${API_URL}/cars/${id}`, {
+                const response = await axios.delete(`${API_URL}/cars/${id}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                showToast('Car deleted successfully');
-                loadCars();
+                
+                if (response.status === 200) {
+                    showToast('Car deleted successfully');
+                    await loadCars();
+                } else {
+                    throw new Error('Failed to delete car');
+                }
             } catch (error) {
-                showToast(error.response?.data?.error || 'Failed to delete car', 'error');
+                console.error('Delete car error:', error);
+                if (error.response?.status === 401) {
+                    showToast('Session expired. Please login again', 'error');
+                    logout();
+                } else if (error.response?.status === 403) {
+                    showToast('You do not have permission to delete this car', 'error');
+                } else {
+                    showToast(error.response?.data?.error || 'Failed to delete car', 'error');
+                }
             } finally {
                 hideLoading();
             }

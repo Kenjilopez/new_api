@@ -22,18 +22,30 @@ def admin_required():
 @car_store_bp.route('/cars', methods=['POST'])
 @jwt_required()
 def add_car():
-    data = request.get_json()
-    model = data.get('model')
-    store_id = data.get('store_id')
-    if not model or not store_id:
-        return jsonify({'error': 'Faltan datos'}), 400
+    try:
+        data = request.get_json()
+        model = data.get('model')
+        store_id = data.get('store_id')
+        if not model or not store_id:
+            return jsonify({'error': 'Faltan datos'}), 400
 
-    session = Session()
-    car = Car(model=model, store_id=store_id)
-    session.add(car)
-    session.commit()
-    session.close()
-    return jsonify({'message': 'Carro insertado correctamente'}), 201
+        # Convertir store_id a entero
+        try:
+            store_id = int(store_id)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'ID de tienda inválido'}), 400
+
+        session = Session()
+        car = Car(model=model, store_id=store_id)
+        session.add(car)
+        session.commit()
+        session.close()
+        return jsonify({'message': 'Carro insertado correctamente'}), 201
+    except Exception as e:
+        if session:
+            session.rollback()
+            session.close()
+        return jsonify({'error': str(e)}), 500
 
 @car_store_bp.route('/cars', methods=['GET'])
 @jwt_required()
@@ -50,18 +62,34 @@ def get_cars():
 @car_store_bp.route('/cars/<int:car_id>', methods=['PUT'])
 @jwt_required()    
 def update_car(car_id):
-    session = Session()
-    car = session.query(Car).get(car_id)
-    if not car:
+    session = None
+    try:
+        session = Session()
+        car = session.query(Car).get(car_id)
+        if not car:
+            session.close()
+            return jsonify({'error': 'Carro no encontrado'}), 404
+        
+        data = request.get_json()
+        car.model = data.get('model', car.model)
+        
+        # Convertir store_id a entero si está presente
+        store_id = data.get('store_id')
+        if store_id is not None:
+            try:
+                car.store_id = int(store_id)
+            except (ValueError, TypeError):
+                session.close()
+                return jsonify({'error': 'ID de tienda inválido'}), 400
+                
+        session.commit()
         session.close()
-        return jsonify({'error': 'Carro no encontrado'}), 404
-    
-    data = request.get_json()
-    car.model = data.get('model', car.model)
-    car.store_id = data.get('store_id', car.store_id)
-    session.commit()
-    session.close()
-    return jsonify({'message': 'Carro actualizado'}), 200
+        return jsonify({'message': 'Carro actualizado'}), 200
+    except Exception as e:
+        if session:
+            session.rollback()
+            session.close()
+        return jsonify({'error': str(e)}), 500
 
 @car_store_bp.route('/cars/<int:car_id>', methods=['DELETE'])
 @jwt_required()
