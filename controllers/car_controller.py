@@ -50,10 +50,13 @@ def get_cars():
 @car_store_bp.route('/cars/<int:car_id>', methods=['PUT'])
 @jwt_required()    
 def update_car(car_id):
+    session = Session()
     car = session.query(Car).get(car_id)
     if not car:
         session.close()
         return jsonify({'error': 'Carro no encontrado'}), 404
+    
+    data = request.get_json()
     car.model = data.get('model', car.model)
     car.store_id = data.get('store_id', car.store_id)
     session.commit()
