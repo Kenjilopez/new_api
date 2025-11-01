@@ -22,8 +22,17 @@ python main.py
 
 Para correr las Instrucciones CRUD of Cars
 
+
+Autorization In all operations of CRUD of cars
+Auth type:  Bearer Token 
+
+Token: "your refresh token given u when u making login" ❗
+
+Warming: you have only 1 minute for use this token ⚠
+
 POST  ----Crear----
 http://127.0.0.1:5000/cars/{id}
+
 {
   "model": "Nissan",
   "store_id": "Gasolina"
