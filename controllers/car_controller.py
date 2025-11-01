@@ -22,9 +22,6 @@ def admin_required():
 @car_store_bp.route('/cars', methods=['POST'])
 @jwt_required()
 def add_car():
-    auth = admin_required()
-    if auth: return auth
-    
     data = request.get_json()
     model = data.get('model')
     store_id = data.get('store_id')
@@ -41,8 +38,6 @@ def add_car():
 @car_store_bp.route('/cars', methods=['GET'])
 @jwt_required()
 def get_cars():
-    auth = admin_required()
-    if auth: return auth
     session = Session()
     cars = session.query(Car).all()
     result = [
@@ -55,10 +50,6 @@ def get_cars():
 @car_store_bp.route('/cars/<int:car_id>', methods=['PUT'])
 @jwt_required()    
 def update_car(car_id):
-    auth = admin_required()
-    if auth: return auth
-    data = request.get_json()
-    session = Session()
     car = session.query(Car).get(car_id)
     if not car:
         session.close()
@@ -72,8 +63,6 @@ def update_car(car_id):
 @car_store_bp.route('/cars/<int:car_id>', methods=['DELETE'])
 @jwt_required()
 def delete_car(car_id):
-    auth = admin_required()
-    if auth: return auth
     session = Session()
     car = session.query(Car).get(car_id)
     if not car:

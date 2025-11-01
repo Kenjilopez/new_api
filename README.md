@@ -1,5 +1,19 @@
 Install these packages:(👇)
 
+pip install virtualenv
+Crea el entorno virtual:
+
+python -m venv venv
+Esto creará una carpeta llamada venv en el directorio del proyecto.
+
+Activa el entorno virtual:
+
+En Linux/Mac:
+source venv/bin/activate
+En Windows:
+venv\Scripts\activate
+Instala las dependencias del proyecto:
+
 pip install -r requirements.txt
 
 
