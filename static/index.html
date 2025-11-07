@@ -94,15 +94,15 @@
                                 <span class="flex items-center">
                                     <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
                                         </path>
                                     </svg>
-                                    Email Address
+                                    Username
                                 </span>
                             </label>
-                            <input type="email" id="email" 
+                            <input type="text" id="username" 
                                 class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                placeholder="Enter your email">
+                                placeholder="Enter your username">
                         </div>
                         <div>
                             <label class="block text-gray-700 text-sm font-medium mb-2">
@@ -118,6 +118,20 @@
                             <input type="password" id="password" 
                                 class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                 placeholder="Enter your password">
+                            <label class="block mt-4 text-gray-700 text-sm font-medium">
+                                <span class="flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                                        </path>
+                                    </svg>
+                                    Role
+                                </span>
+                            </label>
+                            <select id="role" class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                                <option value="client">Client</option>
+                                <option value="admin">Admin</option>
+                            </select>
                         </div>
                         <div class="space-y-4 pt-2">
                             <button onclick="login()" 
@@ -282,29 +296,26 @@
 
         // Authentication functions
         async function login() {
-            const email = document.getElementById('email').value;
+            const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
-            if (!email || !password) {
-                showToast('Please enter both email and password', 'error');
+            if (!username || !password) {
+                showToast('Please enter both username and password', 'error');
                 return;
             }
 
             try {
                 showLoading();
-                const response = await axios.post(`${API_URL}/login`, {
-                    email: email,
+                const response = await axios.post(`${API_URL}/auth/login`, {
+                    username: username,
                     password: password
                 });
                 
-                if (response.data.access_token) {
-                    token = response.data.access_token;
-                    localStorage.setItem('token', token);
-                    checkAuth();
-                    showToast('Login successful!');
-                } else {
-                    throw new Error('No access token received');
-                }
+                token = response.data.token;
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+                checkAuth();
+                showToast('Login successful!');
             } catch (error) {
                 console.error('Login error:', error);
                 showToast(error.response?.data?.error || 'Login failed. Please check your credentials.', 'error');
@@ -314,16 +325,28 @@
         }
 
         async function register() {
-            const email = document.getElementById('email').value;
+            const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
+            const role = document.getElementById('role')?.value || 'client';
+
+            if (!username || !password) {
+                showToast('Please enter both username and password', 'error');
+                return;
+            }
 
             try {
                 showLoading();
-                const response = await axios.post(`${API_URL}/registry`, {
-                    email: email,
-                    password: password
+                const response = await axios.post(`${API_URL}/auth/register`, {
+                    username: username,
+                    password: password,
+                    role: role
                 });
-                showToast('Registration successful! Please login.');
+
+                token = response.data.token;
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+                checkAuth();
+                showToast('Registration successful!');
             } catch (error) {
                 showToast(error.response?.data?.error || 'Registration failed', 'error');
             } finally {

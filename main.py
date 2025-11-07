@@ -1,7 +1,7 @@
 from flask import Flask, send_from_directory, render_template
 from config.jwt import *
 from controllers.car_controller import car_store_bp
-from controllers.user_controller import user_bp, register_jwt_error_handlers
+from controllers.auth_controller import auth_bp
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 
@@ -18,13 +18,9 @@ app.config['JWT_HEADER_TYPE'] = JWT_HEADER_TYPE
 
 jwt = JWTManager(app)
 
-# Registrar los blueprints
+# Register blueprints
 app.register_blueprint(car_store_bp)
-app.register_blueprint(user_bp)
-
-
-# Registrar manejadores personalizados de error JWT
-register_jwt_error_handlers(app)
+app.register_blueprint(auth_bp, url_prefix='/auth')
 
 # Ruta para servir el frontend
 @app.route('/')

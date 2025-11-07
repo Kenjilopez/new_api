@@ -1,55 +1,47 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from repository.car_repository import Car, CarStore, Base
+from controllers.auth_controller import token_required, admin_required
 
 car_store_bp = Blueprint('car_store', __name__)
 
-# Configura la conexión a la base de datos (ajusta la ruta si es necesario)
+# Configure database connection
 engine = create_engine('sqlite:///cars.db')
 Session = sessionmaker(bind=engine)
 Base.metadata.create_all(engine)
-
-
-def admin_required():
-    # identity is the subject (string id). Read additional claims with get_jwt()
-    claims = get_jwt()
-    if claims.get('role') != 'admin':
-        return jsonify({'error': 'Acceso denegado: solo administradores'}), 403
  
  
 @car_store_bp.route('/cars', methods=['POST'])
-@jwt_required()
-def add_car():
+@admin_required
+def add_car(current_user):
     try:
         data = request.get_json()
         model = data.get('model')
         store_id = data.get('store_id')
         if not model or not store_id:
-            return jsonify({'error': 'Faltan datos'}), 400
+            return jsonify({'error': 'Missing data'}), 400
 
-        # Convertir store_id a entero
         try:
             store_id = int(store_id)
         except (ValueError, TypeError):
-            return jsonify({'error': 'ID de tienda inválido'}), 400
+            return jsonify({'error': 'Invalid store ID'}), 400
 
         session = Session()
         car = Car(model=model, store_id=store_id)
         session.add(car)
         session.commit()
         session.close()
-        return jsonify({'message': 'Carro insertado correctamente'}), 201
+        return jsonify({'message': 'Car added successfully'}), 201
     except Exception as e:
-        if session:
+        if 'session' in locals():
             session.rollback()
             session.close()
         return jsonify({'error': str(e)}), 500
 
 @car_store_bp.route('/cars', methods=['GET'])
-@jwt_required()
-def get_cars():
+@token_required
+def get_cars(current_user):
     session = Session()
     cars = session.query(Car).all()
     result = [
@@ -60,31 +52,30 @@ def get_cars():
     return jsonify(result), 200
 
 @car_store_bp.route('/cars/<int:car_id>', methods=['PUT'])
-@jwt_required()    
-def update_car(car_id):
+@admin_required
+def update_car(current_user, car_id):
     session = None
     try:
         session = Session()
         car = session.query(Car).get(car_id)
         if not car:
             session.close()
-            return jsonify({'error': 'Carro no encontrado'}), 404
+            return jsonify({'error': 'Car not found'}), 404
         
         data = request.get_json()
         car.model = data.get('model', car.model)
         
-        # Convertir store_id a entero si está presente
         store_id = data.get('store_id')
         if store_id is not None:
             try:
                 car.store_id = int(store_id)
             except (ValueError, TypeError):
                 session.close()
-                return jsonify({'error': 'ID de tienda inválido'}), 400
+                return jsonify({'error': 'Invalid store ID'}), 400
                 
         session.commit()
         session.close()
-        return jsonify({'message': 'Carro actualizado'}), 200
+        return jsonify({'message': 'Car updated successfully'}), 200
     except Exception as e:
         if session:
             session.rollback()
@@ -92,14 +83,14 @@ def update_car(car_id):
         return jsonify({'error': str(e)}), 500
 
 @car_store_bp.route('/cars/<int:car_id>', methods=['DELETE'])
-@jwt_required()
-def delete_car(car_id):
+@admin_required
+def delete_car(current_user, car_id):
     session = Session()
     car = session.query(Car).get(car_id)
     if not car:
         session.close()
-        return jsonify({'error': 'Carro no encontrado'}), 404
+        return jsonify({'error': 'Car not found'}), 404
     session.delete(car)
     session.commit()
     session.close()
-    return jsonify({'message': 'Carro eliminado'}), 200
+    return jsonify({'message': 'Car deleted successfully'}), 200

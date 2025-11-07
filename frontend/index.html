@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -8,18 +8,63 @@
       body { font-family: Arial, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
       form { margin-bottom: 1rem; }
       label { display:block; margin-top: .5rem; }
-      input[type="text"], input[type="number"] { padding: .4rem; width: 100%; max-width: 320px; }
+      input[type="text"], input[type="number"], input[type="password"] { padding: .4rem; width: 100%; max-width: 320px; }
       button { margin-top: .6rem; padding: .5rem 1rem; }
       .car { border: 1px solid #ddd; padding: .6rem; margin: .4rem 0; display:flex; justify-content:space-between; align-items:center }
       .car > .info { flex:1 }
       .small { font-size: .9rem; color:#555 }
+      .auth-section { margin-bottom: 2rem; }
+      .admin-only { display: none; }
+      .auth-nav { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; }
+      .auth-nav button { margin: 0; }
+      body.is-admin .admin-only { display: block; }
+      body:not(.is-admin) .admin-action { display: none; }
+      .error { color: crimson; }
+      .success { color: green; }
+      #currentUser { margin-left: 1rem; color: #666; }
     </style>
   </head>
   <body>
     <h1>Car Store</h1>
-    <p class="small">This is a simple static frontend that calls the Flask API endpoints at <code>http://127.0.0.1:5000</code>. Make sure your API is running.</p>
+    
+    <div class="auth-section">
+      <div class="auth-nav">
+        <button onclick="showLoginForm()">Login</button>
+        <button onclick="showRegisterForm()">Register</button>
+        <button onclick="logout()" id="logoutBtn" style="display:none">Logout</button>
+        <span id="currentUser"></span>
+      </div>
 
-    <section>
+      <form id="loginForm" style="display:none">
+        <h3>Login</h3>
+        <label>Username
+          <input name="username" type="text" required />
+        </label>
+        <label>Password
+          <input name="password" type="password" required />
+        </label>
+        <button type="submit">Login</button>
+      </form>
+
+      <form id="registerForm" style="display:none">
+        <h3>Register</h3>
+        <label>Username
+          <input name="username" type="text" required />
+        </label>
+        <label>Password
+          <input name="password" type="password" required />
+        </label>
+        <label>Role
+          <select name="role" required>
+            <option value="client">Client</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <button type="submit">Register</button>
+      </form>
+    </div>
+
+    <section class="admin-only">
       <h2>Add a car</h2>
       <form id="addCarForm">
         <label>Model
@@ -38,97 +83,252 @@
     </section>
 
     <script>
-      // Change BASE_URL if your Flask server is running elsewhere
-      const BASE_URL = 'http://127.0.0.1:5000';
+      const BASE_URL = window.location.origin;
+      let currentUser = null;
+
+      // Check if we have a stored token and try to validate it
+      async function checkAuth() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          showLoginForm();
+          return;
+        }
+        try {
+          const user = JSON.parse(localStorage.getItem('user'));
+          if (user) {
+            updateUIForUser(user);
+          }
+        } catch (err) {
+          console.error('Invalid stored user:', err);
+          logout();
+        }
+      }
+
+      function showLoginForm() {
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('registerForm').style.display = 'none';
+      }
+
+      function showRegisterForm() {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'block';
+      }
+
+      function updateUIForUser(user) {
+        currentUser = user;
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'none';
+        document.getElementById('logoutBtn').style.display = 'block';
+        document.getElementById('currentUser').textContent = `Logged in as: ${user.username} (${user.role})`;
+        
+        if (user.role === 'admin') {
+          document.body.classList.add('is-admin');
+        } else {
+          document.body.classList.remove('is-admin');
+        }
+        
+        fetchCars();
+      }
+
+      function logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        currentUser = null;
+        document.getElementById('logoutBtn').style.display = 'none';
+        document.getElementById('currentUser').textContent = '';
+        document.body.classList.remove('is-admin');
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('carsList').innerHTML = '<em>Please login to view cars</em>';
+      }
+
+      document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        try {
+          const res = await fetch(`${BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: formData.get('username'),
+              password: formData.get('password')
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Login failed');
+          
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          updateUIForUser(data.user);
+        } catch (err) {
+          alert('Login failed: ' + err.message);
+        }
+      });
+
+      document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        try {
+          const res = await fetch(`${BASE_URL}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: formData.get('username'),
+              password: formData.get('password'),
+              role: formData.get('role')
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Registration failed');
+          
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          updateUIForUser(data.user);
+        } catch (err) {
+          alert('Registration failed: ' + err.message);
+        }
+      });
 
       async function fetchCars() {
         const list = document.getElementById('carsList');
         list.innerHTML = 'Loading...';
         try {
-          const res = await fetch(`${BASE_URL}/cars`);
-          if (!res.ok) throw new Error('Failed to load');
+          const token = localStorage.getItem('token');
+          if (!token) throw new Error('Please login first');
+          
+          const res = await fetch(`${BASE_URL}/cars`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (!res.ok) throw new Error('Failed to load cars');
           const cars = await res.json();
+          
           if (!Array.isArray(cars) || cars.length === 0) {
             list.innerHTML = '<em>No cars yet</em>';
             return;
           }
+          
           list.innerHTML = '';
           cars.forEach(car => {
             const div = document.createElement('div');
             div.className = 'car';
+            
             const info = document.createElement('div');
             info.className = 'info';
-            info.innerHTML = `<strong>${escapeHtml(car.model)}</strong> <div class="small">id: ${car.id} — store: ${car.store_id}</div>`;
+            info.innerHTML = `
+              <strong>${escapeHtml(car.model)}</strong>
+              <div class="small">ID: ${car.id} — Store ID: ${car.store_id}</div>
+            `;
+            
             const actions = document.createElement('div');
+            actions.className = 'admin-action';
+
+            // Edit button
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.style.marginRight = '0.4rem';
+            editBtn.onclick = () => editCar(car);
 
             // Delete button
-            const del = document.createElement('button');
-            del.textContent = 'Delete';
-            del.onclick = async () => {
-              if (!confirm('Delete this car?')) return;
-              await callApi('DELETE', `/cars/${car.id}`);
-              fetchCars();
-            };
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.onclick = () => deleteCar(car);
 
-            // Update button (simple prompt-based edit)
-            const upd = document.createElement('button');
-            upd.textContent = 'Edit';
-            upd.style.marginRight = '0.4rem';
-            upd.onclick = async () => {
-              const newModel = prompt('New model', car.model);
-              if (newModel === null) return;
-              const newStore = prompt('New store id', car.store_id);
-              if (newStore === null) return;
-              await callApi('PUT', `/cars/${car.id}`, { model: newModel, store_id: Number(newStore) });
-              fetchCars();
-            };
-
-            actions.appendChild(upd);
-            actions.appendChild(del);
+            actions.appendChild(editBtn);
+            actions.appendChild(deleteBtn);
 
             div.appendChild(info);
             div.appendChild(actions);
             list.appendChild(div);
           });
         } catch (err) {
-          list.innerHTML = `<span style="color:crimson">Error loading cars: ${escapeHtml(err.message)}</span>`;
+          if (err.message === 'Please login first') {
+            list.innerHTML = '<em>Please login to view cars</em>';
+          } else {
+            list.innerHTML = `<span class="error">Error: ${escapeHtml(err.message)}</span>`;
+          }
+        }
+      }
+
+      async function editCar(car) {
+        const newModel = prompt('New model name:', car.model);
+        if (newModel === null) return;
+        
+        const newStoreId = prompt('New store ID:', car.store_id);
+        if (newStoreId === null) return;
+
+        try {
+          await callApi('PUT', `/cars/${car.id}`, {
+            model: newModel.trim(),
+            store_id: Number(newStoreId)
+          });
+          fetchCars();
+        } catch (err) {
+          alert('Failed to update car: ' + err.message);
+        }
+      }
+
+      async function deleteCar(car) {
+        if (!confirm(`Delete car "${car.model}"?`)) return;
+        
+        try {
+          await callApi('DELETE', `/cars/${car.id}`);
+          fetchCars();
+        } catch (err) {
+          alert('Failed to delete car: ' + err.message);
         }
       }
 
       async function callApi(method, path, body) {
-        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('Please login first');
+
+        const opts = { 
+          method, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          } 
+        };
         if (body) opts.body = JSON.stringify(body);
+        
         const res = await fetch(BASE_URL + path, opts);
+        const data = await res.json().catch(() => null);
+        
         if (!res.ok) {
-          const txt = await res.text().catch(()=>null);
-          throw new Error(`API ${method} ${path} failed: ${res.status} ${txt || ''}`);
+          throw new Error(data?.error || `API ${method} ${path} failed: ${res.status}`);
         }
-        return res.json().catch(()=>null);
+        
+        return data;
       }
 
       document.getElementById('addCarForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const model = document.getElementById('model').value.trim();
         const storeId = Number(document.getElementById('storeId').value);
+        
         try {
           await callApi('POST', '/cars', { model, store_id: storeId });
           e.target.reset();
           fetchCars();
         } catch (err) {
-          alert('Error: ' + err.message);
+          alert('Failed to add car: ' + err.message);
         }
       });
 
-      // Basic HTML escaper to avoid accidental injection in this demo
       function escapeHtml(str) {
         if (str === undefined || str === null) return '';
-        return String(str).replace(/[&<>\"']/g, function (s) {
-          return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s];
-        });
+        return String(str).replace(/[&<>\"']/g, s => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        })[s]);
       }
 
-      // Load initial data
-      fetchCars();
+      // Initialize the app
+      checkAuth();
     </script>
   </body>
 </html>
